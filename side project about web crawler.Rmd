@@ -1,0 +1,196 @@
+---
+title: "side project about web crawler"
+author: "Boon Hong"
+date: "January 18, 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r setup}
+
+source("pgload.R")
+`load pg`("web")
+
+```
+
+建立key words 只要在 input.keywords 輸入想要搜尋的 key words , 自動爬取 天貓官網 進行排序以及比價 
+
+```{r}
+
+input.keywords <- "滑鼠"
+
+key.words <- URLencode(input.keywords)
+
+url <- str_c("https://list.tmall.com/search_product.htm?q="，key.words，"&type=p&spm=a220m.1000858.a2227oh.d100&from=.list.pc_1_searchbutton",sep="")
+
+```
+
+建立簡單的網絡爬蟲
+
+```{r}
+
+GET(url) %>% 
+  content(as = "text") %>% 
+  read_html() %>% 
+  html_nodes(css = ".productShop-name , .productTitle a , .productPrice em") %>%
+  html_text %>% 
+  as.tibble() -> df
+
+df
+
+```
+
+```{r}
+
+df
+df %<>% 
+  mutate(
+    group = rep(c("price","name","shop"),NROW(df)/3)
+  )
+
+```
+
+```{r}
+
+bind_cols(
+  df %>%  
+    mutate(
+      value = gsub("\n","",value)
+    ) %>% 
+    filter(group=="price") ,
+  df %>% 
+    mutate(
+      value = gsub("\n","",value)
+    ) %>% 
+    filter(group=="name") ,
+  df %>% 
+    mutate(
+      value = gsub("\n","",value)
+    ) %>% 
+    filter(group=="shop")
+) %>% 
+  select(value,value1,value2) %>% 
+  rename(price = value ,
+         name = value1 ,
+         shop = value2) %>% 
+  mutate(
+    price = as.numeric(gsub("¥","",price))
+  ) -> df 
+
+```
+
+```{r}
+
+df %>% 
+  ggplot(aes(reorder(name,price),price)) + 
+  geom_col() +
+  theme_minimal() + 
+  coord_flip()
+ 
+```
+
+價格落在 30 分別有那些
+
+```{r}
+price.min <- 30
+
+df %>% 
+  ggplot(aes(reorder(name,price),price)) + 
+  geom_point(shape = 3 ) + 
+  coord_flip() + 
+  theme_minimal() +
+  # plotly::ggplotly(g)
+  gghighlight::gghighlight(
+    (price) < price.min ,
+    label_key = paste(name,"-- RMD",price) ,
+    # max_highlight = 1L ,
+    label_params = list(size=3,hjust=1.05,vjust=1.05) 
+    ) -> t
+# df %>% 
+
+t$data
+  
+```
+
+# 結論 => 
+
+往下衍生 ,
+
+因爲天貓在翻第二頁時需要賬號登入 ， 
+
+目前需要解決  
+
+1. 建構shiny 手動操作 ，  
+2. 模擬chorme 賬號登入 ,  success
+3. 微博賬號
+
+實際解決問題 
+
+1. shiny 建立 
+
+```{r}
+
+```
+
+
+2. 模擬賬號等入 以  https://www.medscape.com/viewarticle/906028
+做為範例
+
+```{r}
+url <- 'http://www.medscape.com/viewarticle/906028'
+
+html_session(url) -> pg.session 
+
+pg.session  %>% 
+  html_form()  
+  # .[[3]] -> pg.from
+
+```
+
+html session 建立會話 
+html form 裏面 [[3]] 有 login 相關 information
+
+```{r}
+
+pg.form <- set_values(pg.from ,
+           'userId' = 'boonhong565059@gmail.com' , 
+           'password' = 'boonhong'
+           )
+
+sbmt <- submit_form(pg.session,pg.form)
+
+```
+
+```{r}
+
+sbmt %>% 
+  read_html() %>%
+  html_nodes(css = ".title , p") %>% 
+  html_text(trim = T) %>% 
+  as.tibble() %>%  
+  rename(words = value)
+
+```
+
+success 
+
+```{r}
+
+url <- "https://login.taobao.com/member/login.jhtml?redirectURL=http://list.tmall.com/search_product.htm?spm=a220m.1000858.0.0.2e68559btPwqx7&s=60&q=%BB%AC%CA%F3&sort=s&style=g&from=.list.pc_1_searchbutton&qMegab=%E6%BB%91%E9%BC%A0&type=pc#J_Filter" 
+html_session(url) -> wb.session
+
+wb.session %>% 
+  read_html(encoding = "GBK") %>% 
+  html_form() %>% 
+  .[3] -> wb.form 
+
+```
+
+```{r}
+
+```
+
+3. 沒有微博賬號 登入不行 
+
