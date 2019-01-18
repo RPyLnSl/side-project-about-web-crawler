@@ -9,6 +9,7 @@ share about web crawler by R studio ...
 結果 : 
 
      使用shiny 做資料分析
+     視覺化使用 ggplot2 + plotly
 
 未達成的部分 : 
 
